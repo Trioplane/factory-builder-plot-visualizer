@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="src/style.css">
+    <script type="module" src="src/main.js" defer></script>
+    <title>plot visualizer</title>
+  </head>
+  <body>
+    <div class="load-container">
+      <textarea type="text" id="plot-data-input" placeholder="Paste plot data here..."></textarea>
+    </div>
+    <div class="layer-container">
+      <button id="change-axis-button">Y</button>
+      <button id="layer-up-button">Layer Up</button>
+      <button id="layer-down-button">Layer Down</button>
+    </div>
+    <canvas id="mainCanvas"></canvas>
+  </body>
+</html>
