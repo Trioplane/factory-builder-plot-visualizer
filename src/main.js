@@ -68,7 +68,7 @@ async function init() {
 	}
 
   const zipResourceManager = new ZipResourceManager(blockDefinitions, blockModels, textureAtlas, 'fb')
-  await zipResourceManager.loadFromZip(new URL('./resource_pack.zip', import.meta.url).href)
+  await zipResourceManager.loadFromZip(new URL('./resource_pack.zip', import.meta.url).href, new URL('./blocks.zip', import.meta.url).href)
 	// === Structure rendering ===
 
   const BLOCK_MAP = Object.fromEntries(

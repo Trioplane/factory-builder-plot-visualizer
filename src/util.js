@@ -45,7 +45,7 @@ export class InteractiveCanvas {
     canvas,
     onRender,
     center,
-    viewDist = 4,
+    viewDist = 10,
   ) {
     this.onRender = onRender;
     this.center = center;
@@ -92,7 +92,6 @@ export class InteractiveCanvas {
     this.#yRotation = this.#yRotation % (Math.PI * 2)
     this.xRotation = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.#xRotation))
     this.viewDist = Math.max(1, this.viewDist)
-
     const view = mat4.create()
     mat4.translate(view, view, [0, 0, -this.viewDist])
     mat4.rotate(view, view, this.#xRotation, [1, 0, 0])
@@ -111,7 +110,7 @@ export class ZipResourceManager {
   constructor(blockDefinitions, blockModels, textureAtlas, namespace) {
     this.blockDefinitions = blockDefinitions
     this.blockModels = blockModels
-    this.blockAtlas = textureAtlas
+    this.blockAtlas = TextureAtlas.empty()
     this.namespace = namespace
   }
 
@@ -145,11 +144,11 @@ export class ZipResourceManager {
 
   getBlockFlags(id) {
     return {
-      opaque: true
+      opaque: false
     }
   }
 
-  async loadFromZip(url) {
+  async loadFromZip(url, vanillaTexturesUrl) {
     const assetsBuffer = await (await fetch(url)).arrayBuffer()
     const assets = await jszip.loadAsync(assetsBuffer)
     await this.loadFromFolderJson(assets.folder('minecraft/blockstates'), `assets/minecraft/blockstates`, async (id, data) => {
@@ -163,10 +162,13 @@ export class ZipResourceManager {
     const textures = {}
     await this.loadFromFolderPng(assets.folder(`assets/${this.namespace}/textures/block`), `assets/${this.namespace}/textures/block`, async (id, data) => {
       textures[`${this.namespace}:block/` + id] = data
-      console.log(id)
     })
 
-    console.log(textures)
+    const vanillaTexturesBuffer = await (await fetch(vanillaTexturesUrl)).arrayBuffer()
+    const vanilllaTextures = await jszip.loadAsync(vanillaTexturesBuffer)
+    await this.loadFromFolderPng(vanilllaTextures.folder(), ``, async (id, data) => {
+      textures[`minecraft:block/` + id] = data
+    })
 
     this.blockAtlas = await TextureAtlas.fromBlobs(textures)
     Object.values(this.blockModels).forEach(m => m.flatten(this))
