@@ -38,14 +38,14 @@ export class CombinedStructure {
 
 // https://github.com/misode/deepslate/blob/main/demo/main.ts
 export class InteractiveCanvas {
-  #xRotation = 0.8
-  #yRotation = 0.5
+  #xRotation = 20 * Math.PI / 180
+  #yRotation = 45 * Math.PI / 180
 
   constructor(
     canvas,
     onRender,
     center,
-    viewDist = 10,
+    viewDist = 20,
   ) {
     this.onRender = onRender;
     this.center = center;
@@ -107,7 +107,7 @@ export class InteractiveCanvas {
 // https://github.com/jacobsjo/minecraft-jigsaw-preview/blob/main/src/ResourceManger/ZipResourceManager.ts
 // modified a bit and patched bugs very not well but it works, removed typescript syntax
 export class ZipResourceManager {
-  constructor(blockDefinitions, blockModels, textureAtlas, namespace) {
+  constructor(blockDefinitions, blockModels, namespace) {
     this.blockDefinitions = blockDefinitions
     this.blockModels = blockModels
     this.blockAtlas = TextureAtlas.empty()

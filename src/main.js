@@ -16,69 +16,44 @@ const plotDataInput = document.getElementById("plot-data-input")
 const layerUpButton = document.getElementById("layer-up-button")
 const layerDownButton = document.getElementById("layer-down-button")
 const changeAxisButton = document.getElementById("change-axis-button")
+const loadingMessage = document.getElementById("loading-message")
 
 async function init() {
-  const [blockstates, models, uvMap, atlas] = await Promise.all([
+  loadingMessage.textContent = `Fetching ${MCMETA} for vanilla assets...`
+  const [blockstates, models] = await Promise.all([
   	fetch(`${MCMETA}summary/assets/block_definition/data.min.json`).then(r => r.json()),
   	fetch(`${MCMETA}summary/assets/model/data.min.json`).then(r => r.json()),
-  	fetch(`${MCMETA}atlas/all/data.min.json`).then(r => r.json()),
-  	new Promise(res => {
-  		const image = new Image()
-  		image.onload = () => res(image)
-  		image.crossOrigin = 'Anonymous'
-  		image.src = `${MCMETA}atlas/all/atlas.png`
-  	}),
   ])
 
-  // === Prepare assets for item and structure rendering ===
+  // === Prepare assets for  structure rendering ===
+  loadingMessage.textContent = `Preparing block definitions...`
 	const blockDefinitions = {}
 	Object.keys(blockstates).forEach(id => {
-		blockDefinitions['minecraft:' + id] = BlockDefinition.fromJson(blockstates[id])
+    blockDefinitions['minecraft:' + id] = BlockDefinition.fromJson(blockstates[id])
 	})
-
+  
+  loadingMessage.textContent = `Preparing block models...`
 	const blockModels = {}
 	Object.keys(models).forEach(id => {
-		blockModels['minecraft:' + id] = BlockModel.fromJson(models[id])
+    blockModels['minecraft:' + id] = BlockModel.fromJson(models[id])
 	})
 	Object.values(blockModels).forEach((model) => model.flatten({ getBlockModel: id => blockModels[id] }))
-
-	const atlasCanvas = document.createElement('canvas')
-	const atlasSize = upperPowerOfTwo(Math.max(atlas.width, atlas.height))
-	atlasCanvas.width = atlasSize
-	atlasCanvas.height = atlasSize
-	const atlasCtx = atlasCanvas.getContext('2d')
-	atlasCtx.drawImage(atlas, 0, 0)
-	const atlasData = atlasCtx.getImageData(0, 0, atlasSize, atlasSize)
-	const idMap = {}
-	Object.keys(uvMap).forEach(id => {
-		const [u, v, du, dv] = uvMap[id]
-		const dv2 = (du !== dv && id.startsWith('block/')) ? du : dv
-		idMap[Identifier.create(id).toString()] = [u / atlasSize, v / atlasSize, (u + du) / atlasSize, (v + dv2) / atlasSize]
-	})
-	const textureAtlas = new TextureAtlas(atlasData, idMap)
-
-	const vanillaResources = {
-		getBlockDefinition(id) { return blockDefinitions[id.toString()] },
-		getBlockModel(id) { return blockModels[id.toString()] },
-		getTextureUV(id) { return textureAtlas.getTextureUV(id) },
-		getTextureAtlas() { return textureAtlas.getTextureAtlas() },
-		getBlockFlags(id) { return { opaque: false } },
-		getBlockProperties(id) { return null },
-		getDefaultBlockProperties(id) { return null },
-	}
-
-  const zipResourceManager = new ZipResourceManager(blockDefinitions, blockModels, textureAtlas, 'fb')
+  
+  loadingMessage.textContent = `Preparing resource pack assets...`
+  const zipResourceManager = new ZipResourceManager(blockDefinitions, blockModels, 'fb')
   await zipResourceManager.loadFromZip(new URL('./resource_pack.zip', import.meta.url).href, new URL('./blocks.zip', import.meta.url).href)
 	// === Structure rendering ===
-
+  
+  loadingMessage.textContent = `Getting block map...`
   const BLOCK_MAP = Object.fromEntries(
     Object.entries(rawBlockMap).map(([key, value]) => [key, value.map(v => rawBlockSyntaxToBlockState(v, zipResourceManager))])
   );
-
+  
+  // Building floor
+  loadingMessage.textContent = `Building floor...`
   const floorStructure = new Structure(FLOOR_SIZE)
   const floorStructureSize = floorStructure.getSize()
 
-  // Building floor
   for (let x = 0; x < floorStructureSize[0]; x++) {
     for (let z = 0; z < floorStructureSize[2]; z++) {
       const outerEdge = { min: 0, max: floorStructureSize[0] - 1 }
@@ -102,6 +77,7 @@ async function init() {
   }
 
   // Building the whole plot
+  loadingMessage.textContent = `Building plot...`
   let plotData = [];
   let currentLayer = {
     direction: "y",
@@ -112,16 +88,20 @@ async function init() {
   const size = plotStructure.getSize();
 
   // Rendering
+  loadingMessage.textContent = `Initializing canvas...`
 	const structureCanvas = document.getElementById('mainCanvas')
   structureCanvas.width = window.innerWidth;
   structureCanvas.height = window.innerHeight;
 	const structureGl = structureCanvas.getContext('webgl')
+  loadingMessage.textContent = `Making structure renderer...`
   const structureRenderer = new StructureRenderer(structureGl, plotStructure, zipResourceManager)
-
+  
+  loadingMessage.textContent = `Rendering...`
   const interactiveCanvas = new InteractiveCanvas(structureCanvas, view => {
-		structureRenderer.drawStructure(view)
+    structureRenderer.drawStructure(view)
 	}, [size[0] / 2, size[1] / 2, size[2] / 2])
-
+  
+  loadingMessage.textContent = `Registering event listeners`
   plotDataInput.addEventListener('input', () => {
     try {
       plotData = mojangson.simplify(mojangson.parse(plotDataInput.value))
@@ -152,6 +132,8 @@ async function init() {
     changeAxisButton.textContent = currentLayer.direction.toUpperCase()
     redrawPlot(BLOCK_MAP, plotData, floorStructure, currentLayer, structureRenderer, interactiveCanvas)
   })
+
+  loadingMessage.style = 'display: none;'
 }
 
 function buildPlot(blockMap, plotData, floorStructure, layer) {
