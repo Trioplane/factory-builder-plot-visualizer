@@ -15,6 +15,7 @@
   "dependencies": {
     "deepslate": "^0.23.6",
     "gl-matrix": "^3.4.3",
+    "jszip": "^3.10.1",
     "mojangson": "^2.0.4"
   }
 }

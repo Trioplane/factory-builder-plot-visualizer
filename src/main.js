@@ -1,6 +1,6 @@
 
 import { BlockDefinition, BlockModel, Identifier, Structure, StructureRenderer, TextureAtlas, upperPowerOfTwo } from 'deepslate';
-import { CombinedStructure, InteractiveCanvas, rawBlockSyntaxToBlockState } from "./util.js";
+import { CombinedStructure, InteractiveCanvas, rawBlockSyntaxToBlockState, ZipResourceManager } from "./util.js";
 import mojangson from 'mojangson'
 import rawBlockMap from "./blockMap.json" with { type: "json" }
 
@@ -17,20 +17,20 @@ const layerUpButton = document.getElementById("layer-up-button")
 const layerDownButton = document.getElementById("layer-down-button")
 const changeAxisButton = document.getElementById("change-axis-button")
 
-Promise.all([
-	fetch(`${MCMETA}summary/assets/block_definition/data.min.json`).then(r => r.json()),
-	fetch(`${MCMETA}summary/assets/model/data.min.json`).then(r => r.json()),
-	fetch(`${MCMETA}atlas/all/data.min.json`).then(r => r.json()),
-	new Promise(res => {
-		const image = new Image()
-		image.onload = () => res(image)
-		image.crossOrigin = 'Anonymous'
-		image.src = `${MCMETA}atlas/all/atlas.png`
-	}),
-]).then(([blockstates, models, uvMap, atlas]) => {
-	
-	// === Prepare assets for item and structure rendering ===
+async function init() {
+  const [blockstates, models, uvMap, atlas] = await Promise.all([
+  	fetch(`${MCMETA}summary/assets/block_definition/data.min.json`).then(r => r.json()),
+  	fetch(`${MCMETA}summary/assets/model/data.min.json`).then(r => r.json()),
+  	fetch(`${MCMETA}atlas/all/data.min.json`).then(r => r.json()),
+  	new Promise(res => {
+  		const image = new Image()
+  		image.onload = () => res(image)
+  		image.crossOrigin = 'Anonymous'
+  		image.src = `${MCMETA}atlas/all/atlas.png`
+  	}),
+  ])
 
+  // === Prepare assets for item and structure rendering ===
 	const blockDefinitions = {}
 	Object.keys(blockstates).forEach(id => {
 		blockDefinitions['minecraft:' + id] = BlockDefinition.fromJson(blockstates[id])
@@ -57,7 +57,7 @@ Promise.all([
 	})
 	const textureAtlas = new TextureAtlas(atlasData, idMap)
 
-	const resources = {
+	const vanillaResources = {
 		getBlockDefinition(id) { return blockDefinitions[id.toString()] },
 		getBlockModel(id) { return blockModels[id.toString()] },
 		getTextureUV(id) { return textureAtlas.getTextureUV(id) },
@@ -67,10 +67,12 @@ Promise.all([
 		getDefaultBlockProperties(id) { return null },
 	}
 
+  const zipResourceManager = new ZipResourceManager(blockDefinitions, blockModels, textureAtlas, 'fb')
+  await zipResourceManager.loadFromZip(new URL('./resource_pack.zip', import.meta.url).href)
 	// === Structure rendering ===
 
   const BLOCK_MAP = Object.fromEntries(
-    Object.entries(rawBlockMap).map(([key, value]) => [key, value.map(v => rawBlockSyntaxToBlockState(v, resources))])
+    Object.entries(rawBlockMap).map(([key, value]) => [key, value.map(v => rawBlockSyntaxToBlockState(v, zipResourceManager))])
   );
 
   const floorStructure = new Structure(FLOOR_SIZE)
@@ -114,7 +116,7 @@ Promise.all([
   structureCanvas.width = window.innerWidth;
   structureCanvas.height = window.innerHeight;
 	const structureGl = structureCanvas.getContext('webgl')
-  const structureRenderer = new StructureRenderer(structureGl, plotStructure, resources)
+  const structureRenderer = new StructureRenderer(structureGl, plotStructure, zipResourceManager)
 
   const interactiveCanvas = new InteractiveCanvas(structureCanvas, view => {
 		structureRenderer.drawStructure(view)
@@ -150,7 +152,7 @@ Promise.all([
     changeAxisButton.textContent = currentLayer.direction.toUpperCase()
     redrawPlot(BLOCK_MAP, plotData, floorStructure, currentLayer, structureRenderer, interactiveCanvas)
   })
-})
+}
 
 function buildPlot(blockMap, plotData, floorStructure, layer) {
   const factoryStructure = new Structure(FACTORY_SIZE);
@@ -179,3 +181,5 @@ function redrawPlot(blockMap, plotData, floorStructure, layer, structureRenderer
   structureRenderer.setStructure(plotStructure)
   interactiveCanvas.redraw()
 }
+
+init()

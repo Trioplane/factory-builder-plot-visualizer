@@ -1,5 +1,6 @@
-import { BlockState, Identifier, Structure } from "deepslate";
+import { BlockState, Identifier, Structure, BlockDefinition, BlockModel, TextureAtlas } from "deepslate";
 import { mat4 } from "gl-matrix";
+import jszip from 'jszip'
 
 export class CombinedStructure {
   /**
@@ -23,7 +24,7 @@ export class CombinedStructure {
 
             const block = actualStructure.getBlock([x, y, z])
             if (!block) {
-              this.combinedStructure.addBlock(offsetedPos, "minecraft:air")
+              this.combinedStructure.addBlock(offsetedPos, "minecraft:air", {})
               continue;
             }
             const blockState = block.state
@@ -101,6 +102,94 @@ export class InteractiveCanvas {
     }
 
     this.onRender(view)
+  }
+}
+
+// https://github.com/jacobsjo/minecraft-jigsaw-preview/blob/main/src/ResourceManger/ZipResourceManager.ts
+// modified a bit and patched bugs very not well but it works, removed typescript syntax
+export class ZipResourceManager {
+  constructor(blockDefinitions, blockModels, textureAtlas, namespace) {
+    this.blockDefinitions = blockDefinitions
+    this.blockModels = blockModels
+    this.blockAtlas = textureAtlas
+    this.namespace = namespace
+  }
+
+  getTextureAtlas() {
+    return this.blockAtlas.getTextureAtlas()
+  }
+
+  getBlockProperties(id) {
+    return null
+  }
+
+  getDefaultBlockProperties(id) {
+    return null;
+  }
+
+  getBlockDefinition(id) {
+    return this.blockDefinitions[id.toString()]
+  }
+
+  getBlockModel(id) {
+    return this.blockModels[id.toString()]
+  }
+
+  getTextureUV(id) {
+    return this.blockAtlas.getTextureUV(id)
+  }
+
+  getBlockAtlas() {
+    return this.blockAtlas
+  }
+
+  getBlockFlags(id) {
+    return {
+      opaque: true
+    }
+  }
+
+  async loadFromZip(url) {
+    const assetsBuffer = await (await fetch(url)).arrayBuffer()
+    const assets = await jszip.loadAsync(assetsBuffer)
+    await this.loadFromFolderJson(assets.folder('minecraft/blockstates'), `assets/minecraft/blockstates`, async (id, data) => {
+      id = 'minecraft:' + id
+      this.blockDefinitions[id] = BlockDefinition.fromJson(data)
+    })
+    await this.loadFromFolderJson(assets.folder(`assets/${this.namespace}/models/block`), `assets/${this.namespace}/models/block`, async (id, data) => {
+      id = `${this.namespace}:block/` + id
+      this.blockModels[id] = BlockModel.fromJson(data)
+    })
+    const textures = {}
+    await this.loadFromFolderPng(assets.folder(`assets/${this.namespace}/textures/block`), `assets/${this.namespace}/textures/block`, async (id, data) => {
+      textures[`${this.namespace}:block/` + id] = data
+      console.log(id)
+    })
+
+    console.log(textures)
+
+    this.blockAtlas = await TextureAtlas.fromBlobs(textures)
+    Object.values(this.blockModels).forEach(m => m.flatten(this))
+  }
+
+  loadFromFolderJson(folder, folderPath, callback) {
+    const promises = []
+    for (let [path, file] of Object.entries(folder.files)) {
+      if (file.dir || !path.endsWith('.json') || !path.startsWith(folderPath)) continue
+      const id = path.replace(/\.json$/, '').replace(`${folderPath}/`, '')
+      promises.push(file.async('text').then(data => callback(id, JSON.parse(data))))
+    }
+    return Promise.all(promises)
+  }
+
+  loadFromFolderPng(folder, folderPath, callback) {
+    const promises = []
+    for (let [path, file] of Object.entries(folder.files)) {
+      if (file.dir || !path.endsWith('.png') || !path.startsWith(folderPath)) continue
+      const id = path.replace(/\.png$/, '').replace(`${folderPath}/`, '')
+      promises.push(file.async('blob').then(data => callback(id, data)))
+    }
+    return Promise.all(promises)
   }
 }
 
