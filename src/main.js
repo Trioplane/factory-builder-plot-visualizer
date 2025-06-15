@@ -17,6 +17,7 @@ const layerUpButton = document.getElementById("layer-up-button")
 const layerDownButton = document.getElementById("layer-down-button")
 const changeAxisButton = document.getElementById("change-axis-button")
 const loadingMessage = document.getElementById("loading-message")
+const enableGroundGhceckbox = document.getElementById("enable-ground")
 
 async function init() {
   loadingMessage.textContent = `Fetching ${MCMETA} for vanilla assets...`
@@ -133,7 +134,22 @@ async function init() {
     redrawPlot(BLOCK_MAP, plotData, floorStructure, currentLayer, structureRenderer, interactiveCanvas)
   })
 
+  enableGroundGhceckbox.addEventListener('change', () => {
+    redrawPlot(BLOCK_MAP, plotData, floorStructure, currentLayer, structureRenderer, interactiveCanvas)
+  })
+
   loadingMessage.style = 'display: none;'
+
+  // disable context menu
+  if (document.addEventListener) {
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+    }, false);
+  } else {
+    document.attachEvent('oncontextmenu', function() {
+      window.event.returnValue = false;
+    });
+  }
 }
 
 function buildPlot(blockMap, plotData, floorStructure, layer) {
@@ -146,15 +162,10 @@ function buildPlot(blockMap, plotData, floorStructure, layer) {
   }
 
   const FULL_PLOT_SIZE = [...FLOOR_SIZE].map((v, i) => v >= FACTORY_SIZE[i] ? v : v + FACTORY_SIZE[i]);
-  const structure = new CombinedStructure(FULL_PLOT_SIZE, [
-        {
-          structure: floorStructure,
-          offset: [0, 0, 0]
-        }, {
-          structure: factoryStructure,
-          offset: [0, 0, 0]
-        }
-      ]).combinedStructure;
+  var structures = [{ structure: factoryStructure, offset: [0, 0, 0] }];
+  if (enableGroundGhceckbox.checked || factoryStructure.getBlocks().length == 0)
+    structures.push({ structure: floorStructure, offset: [0, 0, 0] });
+  const structure = new CombinedStructure(FULL_PLOT_SIZE, structures).combinedStructure;
   return structure
 }
 

@@ -1,5 +1,5 @@
 import { BlockState, Identifier, Structure, BlockDefinition, BlockModel, TextureAtlas } from "deepslate";
-import { mat4 } from "gl-matrix";
+import { mat4, vec3 } from "gl-matrix";
 import jszip from 'jszip'
 
 export class CombinedStructure {
@@ -44,35 +44,61 @@ export class InteractiveCanvas {
   constructor(
     canvas,
     onRender,
-    center,
-    viewDist = 20,
+    structureCenter
   ) {
     this.onRender = onRender;
-    this.center = center;
-    this.viewDist = viewDist;
+    this.structureCenter = structureCenter;
+    this.center = [0, 0, 20];
 
     let dragPos = null;
+    let panPos = null;
 
     canvas.addEventListener('mousedown', evt => {
-      if (evt.button === 0) {
+      if (evt.button === 2) {
         dragPos = [evt.clientX, evt.clientY]
+      }
+      if(evt.button === 1) {
+        panPos = [evt.clientX, evt.clientY]
       }
     })
     canvas.addEventListener('mousemove', evt => {
       if (dragPos) {
-        this.#yRotation += (evt.clientX - dragPos[0]) / 100
-        this.#xRotation += (evt.clientY - dragPos[1]) / 100
+        this.#yRotation += (evt.clientX - dragPos[0]) / 250
+        this.#xRotation += (evt.clientY - dragPos[1]) / 250
         this.#xRotation = Math.max(Math.PI / -2, Math.min(Math.PI / 2, this.#xRotation))
         dragPos = [evt.clientX, evt.clientY]
+        this.redraw()
+      }
+      if(panPos) {
+        /*// generate UP vector for camera
+        var zero = vec3.fromValues(0, 0, 0)
+        var UP = vec3.fromValues(0, 1, 0)
+        vec3.rotateY(UP, UP, zero, -this.#yRotation)
+        vec3.rotateX(UP, UP, zero, -this.#xRotation)
+        vec3.scale(UP, UP, (evt.clientY - panPos[1]) / 250)
+        // move camera according to mouse dY and UP vector
+        this.center = [this.center[0] + UP[0], this.center[1] + UP[1], this.center[2] + UP[2]]
+        
+        // generate RIGHT vector for camera
+        var RIGHT = vec3.fromValues(1, 0, 0)
+        vec3.rotateY(RIGHT, RIGHT, zero, -this.#yRotation)
+        vec3.rotateX(RIGHT, RIGHT, zero, -this.#xRotation)
+        vec3.scale(RIGHT, RIGHT, (evt.clientX - panPos[0]) / 250)
+        // move camera according to mouse dY and UP vector
+        this.center = [this.center[0] + RIGHT[0], this.center[1] + RIGHT[1], this.center[2] + RIGHT[2]]*/
+        this.center[0] -= (evt.clientX - panPos[0]) / 50
+        this.center[1] += (evt.clientY - panPos[1]) / 50
+        panPos = [evt.clientX, evt.clientY]
         this.redraw()
       }
     })
     canvas.addEventListener('mouseup', () => {
       dragPos = null
+      panPos = null
     })
     canvas.addEventListener('wheel', evt => {
       evt.preventDefault()
-      this.viewDist += evt.deltaY / 100
+      this.center[2] += evt.deltaY / 100
       this.redraw()
     })
     window.addEventListener('resize', () => {
@@ -91,14 +117,11 @@ export class InteractiveCanvas {
   #renderImmediately() {
     this.#yRotation = this.#yRotation % (Math.PI * 2)
     this.xRotation = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.#xRotation))
-    this.viewDist = Math.max(1, this.viewDist)
     const view = mat4.create()
-    mat4.translate(view, view, [0, 0, -this.viewDist])
+    mat4.translate(view, view, [-this.center[0], -this.center[1], -this.center[2]])
     mat4.rotate(view, view, this.#xRotation, [1, 0, 0])
     mat4.rotate(view, view, this.#yRotation, [0, 1, 0])
-    if (this.center) {
-      mat4.translate(view, view, [-this.center[0], -this.center[1], -this.center[2]])
-    }
+    mat4.translate(view, view, [-this.structureCenter[0], -this.structureCenter[1], -this.structureCenter[2]])
 
     this.onRender(view)
   }

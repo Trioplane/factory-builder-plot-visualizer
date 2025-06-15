@@ -74,6 +74,13 @@ body {
       border-bottom: 0px solid #4056e2;
     }
   }
+  input {
+    margin-top: 10px;
+    margin-right: 10px;
+  }
+  span {
+    color: white
+  }
 }
 
 #loading-message {
